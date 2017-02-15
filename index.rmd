@@ -1,5 +1,111 @@
 ---
 title: "Home"
-
 ---
-#Lee Is Awesome
+`r date()`
+
+```{r Packages, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+require("ggplot2")
+require("dplyr")
+require("tidyr")
+require("ggthemes")
+require("knitr")
+```
+
+```{r Data, echo= FALSE, warning=FALSE, results='hide'}
+FPLOVRD <- read.csv("http://fantasyoverlord.com/FPL/DataWithForecasts")
+T.P.N <- FPLOVRD %>% mutate(Fullname = paste(FirstName, " " ,Surname), Cost.M = Cost / 1000000, Value = AveragePoints/ Cost.M, Total.Value = TotalPoints/Cost.M) %>% select(Pos = PositionsList, Team,Fullname,Cost.M, Saves,Assists,CleanSheets,GoalsScored,GoalsConceded, PointsLastRound, SelectedByPercent, Transfers = TransfersIn - TransfersOut, RoundTrans = TransfersInRound - TransfersOutRound, Value, Total.Value, TotalPoints, AveragePoints,Form) 
+Forecast <- FPLOVRD %>% select(contains("GW"))
+Fiveweek <- Forecast[,1:5]
+Fiveweek.value <- Fiveweek / T.P.N$Cost.M
+names(Fiveweek.value) <- paste(names(Fiveweek.value),".Value")
+FPLData <- T.P.N %>% bind_cols(Fiveweek) %>% bind_cols(Fiveweek.value)
+```
+#{.tabset .tabset-fade .tabset-pills}
+## Best Team by Total Points
+
+```{r Data Filter.TP, results="hide", echo=FALSE}
+GKs   <- FPLData %>% filter(Pos == "GLK") %>% top_n(2,TotalPoints)
+Defs  <- FPLData %>% filter(Pos == "DEF") %>% top_n(5,TotalPoints)
+Mids  <- FPLData %>% filter(Pos == "MID") %>% top_n(5,TotalPoints)
+Fwds  <- FPLData %>% filter(Pos == "FWD") %>% top_n(3,TotalPoints)
+Best.Total <- GKs %>% bind_rows(Defs) %>% bind_rows(Mids) %>% bind_rows(Fwds)
+```
+```{r Plot.1, echo=FALSE}
+Best.Total %>% ggplot(aes(Fullname,TotalPoints))+ geom_bar(stat = "identity",aes(fill = Pos)) + coord_flip() + theme_economist() + scale_fill_tableau(palette = "tableau10")
+```
+
+## Team with the Highest Total Value (Points/Cost)
+
+```{r, results="hide", echo=FALSE}
+GKs   <- FPLData %>% filter(Pos == "GLK") %>% top_n(2,Total.Value)
+Defs  <- FPLData %>% filter(Pos == "DEF") %>% top_n(5,Total.Value)
+Mids  <- FPLData %>% filter(Pos == "MID") %>% top_n(5,Total.Value)
+Fwds  <- FPLData %>% filter(Pos == "FWD") %>% top_n(3,Total.Value)
+Best.Value <- GKs %>% bind_rows(Defs) %>% bind_rows(Mids) %>% bind_rows(Fwds)
+```
+```{r, echo=FALSE}
+Best.Value %>% ggplot(aes(Fullname,Total.Value))+ geom_bar(stat = "identity",aes(fill = Pos)) + coord_flip() + theme_economist() + scale_fill_tableau(palette = "tableau10")
+```
+
+## In Form Differential Players (Owned by <10%).
+
+```{r, results="hide", echo=FALSE}
+GKs   <- FPLData %>% filter(Pos == "GLK",SelectedByPercent < 10) %>% top_n(2,Form)
+Defs  <- FPLData %>% filter(Pos == "DEF",SelectedByPercent < 10) %>% top_n(5,Form)
+Mids  <- FPLData %>% filter(Pos == "MID",SelectedByPercent < 10) %>% top_n(5,Form)
+Fwds  <- FPLData %>% filter(Pos == "FWD",SelectedByPercent < 10) %>% top_n(3,Form)
+Best.DiffForm <- GKs %>% bind_rows(Defs) %>% bind_rows(Mids) %>% bind_rows(Fwds)
+```
+```{r, echo=FALSE}
+Best.DiffForm %>% ggplot(aes(Fullname,Form))+ geom_bar(stat = "identity",aes(fill = Pos)) + coord_flip() + theme_economist() + scale_fill_tableau(palette = "tableau10")
+```
+
+## Predicted Week "Heat" by Fantasy Overlord
+
+```{r,echo=FALSE,results="hide"}
+Best <- Best.Total %>% bind_rows(Best.Value) %>% bind_rows(Best.DiffForm) %>% distinct()
+Best.trans <- Best %>% gather("Week", "Forecast",19:23) %>% mutate(Week = extract_numeric(Week))
+Best.trans.f <- Best.trans %>% filter(Pos == "FWD")
+Best.trans.m <- Best.trans %>% filter(Pos == "MID") 
+Best.trans.d <- Best.trans %>% filter(Pos == "DEF")
+Best.trans.g <- Best.trans %>% filter(Pos == "GLK")
+```
+
+```{r, echo=FALSE}
+Best.trans.f %>% ggplot(aes(Fullname,Week)) + geom_raster(aes(fill=Forecast)) + coord_flip()+ theme_economist() + scale_fill_gradient2(low = "blue",mid = "blue",midpoint = 7,high = "red")
+Best.trans.m %>% ggplot(aes(Fullname,Week)) + geom_raster(aes(fill=Forecast)) + coord_flip()+ theme_economist() + scale_fill_gradient2(low = "blue",mid = "blue",midpoint = 7,high = "red")
+Best.trans.d %>% ggplot(aes(Fullname,Week)) + geom_raster(aes(fill=Forecast)) + coord_flip()+ theme_economist() + scale_fill_gradient2(low = "blue",mid = "blue",midpoint = 7,high = "red")
+Best.trans.g %>% ggplot(aes(Fullname,Week)) + geom_raster(aes(fill=Forecast)) + coord_flip()+ theme_economist() + scale_fill_gradient2(low = "blue",mid = "blue",midpoint = 7,high = "red")
+kable(Best)
+```
+
+## Team with the Best Predicted Value Next Week (Points/Cost):
+
+```{r, echo=FALSE}
+GW <- FPLData %>% select(contains(".Value"))
+GWname <- as.name(names(GW)[2])
+GKs   <- FPLData %>% filter(Pos == "GLK") %>% top_n(2,GWname)
+Defs  <- FPLData %>% filter(Pos == "DEF") %>% top_n(5,GWname)
+Mids  <- FPLData %>% filter(Pos == "MID",SelectedByPercent < 10) %>% top_n(5,GWname)
+Fwds  <- FPLData %>% filter(Pos == "FWD",SelectedByPercent < 10) %>% top_n(3,GWname)
+Best.Nextweek <- GKs %>% bind_rows(Defs) %>% bind_rows(Mids) %>% bind_rows(Fwds)
+kable(Best.Nextweek)
+```
+
+>The total cost of this team is `r sum(Best.Nextweek$Cost.M)`
+
+## Team with the Most Predicted Points Next Week
+
+```{r, echo=FALSE}
+GW <- FPLData %>% select(contains("GW"))
+GWname <- as.name(names(GW)[1])
+GKs   <- FPLData %>% filter(Pos == "GLK") %>% top_n(2,GWname)
+Defs  <- FPLData %>% filter(Pos == "DEF") %>% top_n(5,GWname)
+Mids  <- FPLData %>% filter(Pos == "MID",SelectedByPercent < 10) %>% top_n(5,GWname)
+Fwds  <- FPLData %>% filter(Pos == "FWD",SelectedByPercent < 10) %>% top_n(3,GWname)
+Best.Nextweek <- GKs %>% bind_rows(Defs) %>% bind_rows(Mids) %>% bind_rows(Fwds)
+kable(Best.Nextweek)
+```
+
+>The total cost of this team is `r sum(Best.Nextweek$Cost.M)`
+

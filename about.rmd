@@ -2,3 +2,5 @@
 title: "About"
 
 ---
+
+# I recently realized that I could easily create a github website instead of sending frequent emails. Enjoy and feel free to share.
